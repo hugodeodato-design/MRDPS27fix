@@ -1,0 +1,392 @@
+
+╔══════════════════════════════════════════════════════════════════╗
+║         MRDPSTOCK v3 — GUIDE DE DÉPLOIEMENT VPS ENTREPRISE      ║
+║                        M.R.D.P.S 27                             ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Rédigé pour un déploiement professionnel sur serveur Linux (Ubuntu 22.04+)
+avec accès SSH, nom de domaine et certificat SSL.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 1 — PRÉREQUIS SUR LE VPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Connectez-vous en SSH à votre VPS :
+  ssh root@VOTRE_IP_VPS
+
+Mettre à jour le système :
+  apt update && apt upgrade -y
+
+Installer Node.js 20 :
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  apt install -y nodejs
+
+Installer Git :
+  apt install -y git
+
+Installer PM2 (gestionnaire de processus) :
+  npm install -g pm2
+
+Installer Nginx (serveur web / reverse proxy) :
+  apt install -y nginx
+
+Installer Certbot (certificat SSL gratuit Let's Encrypt) :
+  apt install -y certbot python3-certbot-nginx
+
+Vérifier les versions installées :
+  node -v       → doit afficher v20.x.x
+  npm -v        → doit afficher 10.x.x
+  pm2 -v        → doit afficher une version
+  nginx -v      → doit afficher une version
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 2 — RÉCUPÉRER LE CODE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Créer le dossier de l'application :
+  mkdir -p /var/www/mrdpstock
+  cd /var/www/mrdpstock
+
+Cloner depuis GitHub :
+  git clone https://github.com/hugodeodato-design/mrdpstock.git .
+
+  (Le point à la fin est important — clone dans le dossier courant)
+
+Vérifier que les fichiers sont là :
+  ls -la
+  → Vous devez voir : client/  server/  package.json  etc.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 3 — CRÉER LE FICHIER .env
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Générer une clé JWT aléatoire sécurisée :
+  node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+  → Copiez le résultat, vous en aurez besoin juste après
+
+Créer le fichier .env dans le dossier server/ :
+  nano /var/www/mrdpstock/server/.env
+
+Coller le contenu suivant (adaptez chaque valeur) :
+
+─────────────────────────────────────────────
+PORT=3001
+JWT_SECRET=COLLEZ_ICI_LA_CLE_GENEREE_AU_DESSUS
+JWT_EXPIRES_IN=8h
+
+DB_PATH=./data/mrdpstock.db
+
+ADMIN_EMAIL=votre@email.pro
+APP_URL=https://votre-domaine.fr
+
+SMTP_HOST=mail.votreentreprise.fr
+SMTP_USER=noreply@votreentreprise.fr
+SMTP_PASS=votre_mot_de_passe_email
+SMTP_FROM=MRDPSTOCK <noreply@votreentreprise.fr>
+
+BACKUP_ENABLED=true
+BACKUP_DIR=./data/backups
+BACKUP_HOUR=2
+BACKUP_KEEP=7
+─────────────────────────────────────────────
+
+Sauvegarder : Ctrl+O puis Entrée, puis Ctrl+X pour quitter
+
+Sécuriser le fichier (lecture uniquement par root) :
+  chmod 600 /var/www/mrdpstock/server/.env
+
+Créer le dossier data (base de données + sauvegardes) :
+  mkdir -p /var/www/mrdpstock/server/data/backups
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 4 — INSTALLER LES DÉPENDANCES ET COMPILER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Installer les dépendances du serveur :
+  cd /var/www/mrdpstock/server
+  npm install
+
+Installer les dépendances du client et compiler :
+  cd /var/www/mrdpstock/client
+  npm install
+  npm run build
+
+  → Cela crée le dossier client/dist/ avec le frontend compilé
+  → Cette étape prend 1 à 2 minutes
+
+Vérifier que la compilation a réussi :
+  ls /var/www/mrdpstock/client/dist/
+  → Vous devez voir : index.html  assets/
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 5 — DÉMARRER L'APPLICATION AVEC PM2
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Démarrer l'application :
+  cd /var/www/mrdpstock/server
+  pm2 start index.js --name mrdpstock
+
+Vérifier que l'application tourne :
+  pm2 status
+  → Vous devez voir "mrdpstock" avec status "online"
+
+Voir les logs en temps réel :
+  pm2 logs mrdpstock
+
+  → Vous devez voir :
+      ✅ Base de données initialisée
+      ✅ Admin créé — email: votre@email.pro
+      ✅ SMTP auto-découvert (si email configuré)
+      MRDPSTOCK v3.0 — Serveur démarré sur le port 3001
+
+Configurer PM2 pour redémarrer automatiquement au reboot :
+  pm2 startup
+  → Exécutez la commande affichée (commence par "sudo env PATH=...")
+  pm2 save
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 6 — CONFIGURER NGINX (REVERSE PROXY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Créer la configuration Nginx :
+  nano /etc/nginx/sites-available/mrdpstock
+
+Coller le contenu suivant
+(remplacez votre-domaine.fr par votre vrai domaine) :
+
+─────────────────────────────────────────────
+server {
+    listen 80;
+    server_name votre-domaine.fr www.votre-domaine.fr;
+
+    # Taille max upload (photos articles)
+    client_max_body_size 15M;
+
+    # Compression
+    gzip on;
+    gzip_types text/plain application/json application/javascript text/css;
+
+    location / {
+        proxy_pass         http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 300s;
+    }
+}
+─────────────────────────────────────────────
+
+Activer la configuration :
+  ln -s /etc/nginx/sites-available/mrdpstock /etc/nginx/sites-enabled/
+  nginx -t
+  → Doit afficher "syntax is ok" et "test is successful"
+
+  systemctl reload nginx
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 7 — CERTIFICAT SSL (HTTPS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ⚠️ VOTRE DOMAINE DOIT DÉJÀ POINTER SUR L'IP DE VOTRE VPS
+     (DNS configuré chez votre registrar — propagation 5 à 30 min)
+
+Obtenir le certificat SSL :
+  certbot --nginx -d votre-domaine.fr -d www.votre-domaine.fr
+
+  → Certbot modifie automatiquement la config Nginx
+  → Entrez votre email quand demandé
+  → Acceptez les conditions
+  → Choisissez option 2 (redirection HTTP → HTTPS)
+
+Vérifier le renouvellement automatique :
+  certbot renew --dry-run
+  → Doit afficher "Congratulations, all simulated renewals succeeded"
+
+Tester votre site :
+  Ouvrez https://votre-domaine.fr dans votre navigateur
+  → Vous devez voir l'écran de connexion MRDPSTOCK
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 8 — PREMIÈRE CONNEXION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ouvrez https://votre-domaine.fr
+
+Email    : la valeur de ADMIN_EMAIL dans votre .env
+Mot de passe : admin1234
+
+  ⚠️ CHANGEZ CE MOT DE PASSE IMMÉDIATEMENT
+     Menu → Paramètres → Sécurité → Modifier le mot de passe
+
+Inviter vos collègues :
+  Menu → Utilisateurs → Inviter un utilisateur
+  → Renseignez nom + email professionnel
+  → Cliquez "Envoyer l'invitation"
+  → Ils reçoivent un email avec un lien d'activation valable 48h
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 9 — FIREWALL (SÉCURITÉ)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Configurer le pare-feu (n'autoriser que SSH, HTTP et HTTPS) :
+  ufw allow OpenSSH
+  ufw allow 'Nginx Full'
+  ufw enable
+
+  → Tapez "y" pour confirmer
+
+Vérifier :
+  ufw status
+  → Doit afficher SSH, Nginx HTTP, Nginx HTTPS en "ALLOW"
+
+  ⚠️ Le port 3001 ne doit PAS être ouvert directement
+     Nginx fait le relais en toute sécurité
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ÉTAPE 10 — MISE À JOUR DE L'APPLICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Quand vous avez une nouvelle version à déployer :
+
+  cd /var/www/mrdpstock
+  git pull origin main
+  cd server && npm install
+  cd ../client && npm install && npm run build
+  pm2 restart mrdpstock
+
+  → L'application redémarre avec la nouvelle version
+  → Vos données (base SQLite) sont préservées
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  COMMANDES UTILES AU QUOTIDIEN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Voir l'état de l'application :
+  pm2 status
+
+Voir les logs en direct :
+  pm2 logs mrdpstock --lines 50
+
+Redémarrer l'application :
+  pm2 restart mrdpstock
+
+Arrêter l'application :
+  pm2 stop mrdpstock
+
+Faire une sauvegarde manuelle immédiate :
+  → Dans l'app : Paramètres → Données → Sauvegarde manuelle
+  → Ou via API : POST https://votre-domaine.fr/api/admin/backups
+
+Télécharger une sauvegarde :
+  → Dans l'app : Paramètres → Données → liste des sauvegardes
+
+Vérifier l'espace disque :
+  df -h /var/www/mrdpstock/server/data
+
+Tester la config email depuis l'app :
+  → Paramètres → Serveur → "Tester la connexion"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CHECKLIST FINALE AVANT MISE EN PRODUCTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  □ Node.js v20 installé
+  □ Fichier .env créé avec toutes les variables
+  □ JWT_SECRET = clé aléatoire unique (jamais "changez_cette_cle")
+  □ ADMIN_EMAIL = votre email pro réel
+  □ APP_URL = votre vraie URL avec https://
+  □ SMTP configuré (testez depuis l'app)
+  □ npm install fait dans server/ ET client/
+  □ npm run build fait dans client/
+  □ PM2 démarre l'application
+  □ PM2 configuré pour redémarrer au reboot (pm2 startup + pm2 save)
+  □ Nginx configuré et actif
+  □ Certificat SSL Let's Encrypt installé
+  □ Firewall actif (ufw)
+  □ Port 3001 NON exposé directement
+  □ Mot de passe Admin changé à la première connexion
+  □ Sauvegarde automatique active (BACKUP_ENABLED=true)
+  □ Fichier .env dans .gitignore (ne jamais commiter)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  RÉSOLUTION DE PROBLÈMES FRÉQUENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+L'app ne démarre pas :
+  pm2 logs mrdpstock
+  → Lisez l'erreur, souvent c'est un problème de .env manquant
+
+Page blanche ou erreur 502 :
+  systemctl status nginx
+  pm2 status
+  → Vérifiez que les deux tournent
+
+Emails non reçus :
+  → Dans l'app : Paramètres → Serveur → Tester la connexion
+  → Vérifiez SMTP_HOST, SMTP_USER, SMTP_PASS dans .env
+  → Vérifiez que le port 587 ou 465 n'est pas bloqué par votre hébergeur
+
+Erreur "EACCES permission denied" sur le port 3001 :
+  → PM2 tourne en user, pas en root — c'est normal
+  → Nginx fait le relais sur le port 80/443, c'est la bonne architecture
+
+Certificat SSL expiré :
+  certbot renew
+  systemctl reload nginx
+
+Base de données corrompue (rare) :
+  → Restaurez depuis une sauvegarde dans server/data/backups/
+  cp server/data/backups/mrdpstock-backup-XXXX.db server/data/mrdpstock.db
+  pm2 restart mrdpstock
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  INFORMATIONS TECHNIQUES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Application    : MRDPSTOCK v3.0
+Backend        : Node.js + Express
+Base de données: SQLite (better-sqlite3, mode WAL)
+Frontend       : React + Vite (compilé statique)
+Process manager: PM2
+Serveur web    : Nginx (reverse proxy)
+SSL            : Let's Encrypt (renouvellement auto)
+Emails         : Nodemailer (auto-découverte SMTP)
+Sauvegardes    : SQLite backup natif, quotidien à 2h
+Logs           : PM2 logs (pm2 logs mrdpstock)
+
+Répertoires importants :
+  /var/www/mrdpstock/           → racine du projet
+  /var/www/mrdpstock/server/    → backend Node.js
+  /var/www/mrdpstock/client/    → frontend React
+  /var/www/mrdpstock/client/dist/ → frontend compilé
+  /var/www/mrdpstock/server/data/ → base de données + sauvegardes
+  /etc/nginx/sites-available/mrdpstock → config Nginx
+
+Ports utilisés :
+  80   → HTTP (redirigé vers HTTPS par Certbot)
+  443  → HTTPS (Nginx)
+  3001 → Node.js (interne uniquement, non exposé)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  © 2026 MRDPSTOCK — Document confidentiel M.R.D.P.S 27
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

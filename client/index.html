@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MRDPSTOCK</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; box-sizing: border-box; }
+    html, body, #root { height: 100%; overflow: hidden; }
+    body { font-family: 'DM Sans', system-ui, sans-serif; background: #060D18; color: #E8F0FE; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Polyfill window.storage pour VPS/navigateur (remplace l'API Artifact de Claude.ai) -->
+  <script>
+    if (!window.storage) {
+      const PREFIX = 'mrdp_store_';
+      window.storage = {
+        get: async function(key) {
+          try {
+            var v = localStorage.getItem(PREFIX + key);
+            return v !== null ? { key: key, value: v } : null;
+          } catch(e) { return null; }
+        },
+        set: async function(key, value) {
+          try {
+            var s = (typeof value === 'string') ? value : JSON.stringify(value);
+            localStorage.setItem(PREFIX + key, s);
+            return { key: key, value: s };
+          } catch(e) { return null; }
+        },
+        delete: async function(key) {
+          try { localStorage.removeItem(PREFIX + key); return { key: key, deleted: true }; }
+          catch(e) { return null; }
+        },
+        list: async function(prefix) {
+          try {
+            var keys = Object.keys(localStorage)
+              .filter(function(k){ return k.startsWith(PREFIX + (prefix||'')); })
+              .map(function(k){ return k.slice(PREFIX.length); });
+            return { keys: keys };
+          } catch(e) { return { keys: [] }; }
+        }
+      };
+    }
+  </script>
+
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
