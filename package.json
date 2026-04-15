@@ -1,14 +1,11 @@
-{
+﻿{
   "name": "mrdpstock",
-  "version": "2.0.0",
-  "description": "Logiciel de gestion de stock professionnel",
+  "version": "3.0.1",
   "private": true,
-  "workspaces": ["server", "client"],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=server\" \"npm run dev --workspace=client\"",
-    "build": "npm run build --workspace=client",
-    "start": "npm run start --workspace=server",
-    "install:all": "npm install && npm install --workspace=server && npm install --workspace=client"
+    "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\"",
+    "build": "cd client && npm run build",
+    "start": "node server/index.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
