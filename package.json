@@ -1,19 +1,16 @@
-﻿
 {
-  "name": "mrdpstock-client",
-  "version": "3.0.1",
-  "type": "module",
+  "name": "mrdpstock",
+  "version": "2.0.0",
+  "description": "Logiciel de gestion de stock professionnel",
+  "private": true,
+  "workspaces": ["server", "client"],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build"
-  },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "xlsx": "^0.18.5"
+    "dev": "concurrently \"npm run dev --workspace=server\" \"npm run dev --workspace=client\"",
+    "build": "npm run build --workspace=client",
+    "start": "npm run start --workspace=server",
+    "install:all": "npm install && npm install --workspace=server && npm install --workspace=client"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.2"
+    "concurrently": "^8.2.2"
   }
 }
