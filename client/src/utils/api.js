@@ -35,7 +35,7 @@ async function fetchWithAuth(url, options = {}) {
   return response.json();
 }
 
-// Fonction pour télécharger un fichier
+// Fonction pour télécharger un fichier (Excel, rapports, etc.)
 export function downloadBlob(data, filename, type = 'application/octet-stream') {
   const blob = new Blob([data], { type });
   const url = URL.createObjectURL(blob);
@@ -61,7 +61,10 @@ export const api = {
 
   getBases: () => fetchWithAuth('/api/bases'),
   createBase: (name) =>
-    fetchWithAuth('/api/bases', { method: 'POST', body: JSON.stringify({ name }) }),
+    fetchWithAuth('/api/bases', { 
+      method: 'POST', 
+      body: JSON.stringify({ name }) 
+    }),
 
   getItems: (baseId, params = {}) => {
     const query = new URLSearchParams({ base_id: baseId });
@@ -87,7 +90,6 @@ export const api = {
   saveSettings: (data) =>
     fetchWithAuth('/api/settings', { method: 'PUT', body: JSON.stringify(data) }),
 
-  // Ajout de getHistory (manquant)
   getHistory: (params = {}) => {
     const query = new URLSearchParams(params);
     return fetchWithAuth(`/api/history?${query.toString()}`);
@@ -98,6 +100,3 @@ export const api = {
     return fetchWithAuth(`/api/mouvements?${query.toString()}`);
   },
 };
-
-// Export de downloadBlob
-export { downloadBlob };
