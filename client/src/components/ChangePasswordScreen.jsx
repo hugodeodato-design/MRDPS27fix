@@ -1,21 +1,45 @@
-// src/components/ChangePasswordScreen.jsx
+// client/src/components/ChangePasswordScreen.jsx
 import { useState } from 'react';
-import { Ic, Btn, Field, Inp } from './ui/index.jsx';
+import { Ic, Btn, Field, Inp, toast } from './ui/index.jsx';
 import { T } from '../utils/theme.js';
 
-export default function ChangePasswordScreen({ user, onSave, onLogout }) {
+export default function ChangePasswordScreen({ user, onChanged }) {
   const [form, setForm] = useState({ newPwd: '', confirmPwd: '' });
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
-    if (form.newPwd.length < 8) { setErr('Le mot de passe doit faire au moins 8 caractères'); return; }
-    if (form.newPwd !== form.confirmPwd) { setErr('Les mots de passe ne correspondent pas'); return; }
+    if (form.newPwd.length < 8) {
+      setErr('Le mot de passe doit faire au moins 8 caractères');
+      return;
+    }
+    if (form.newPwd !== form.confirmPwd) {
+      setErr('Les mots de passe ne correspondent pas');
+      return;
+    }
+
     setLoading(true);
+    setErr('');
+
     try {
-      await onSave('', form.newPwd); // pas besoin de l'ancien au 1er login
+      // Appel à l'API de changement de mot de passe
+      const resp = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword: form.newPwd }),
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        throw new Error(data.error || 'Erreur lors du changement de mot de passe');
+      }
+
+      toast('Mot de passe défini avec succès', 'success');
+      if (onChanged) onChanged();   // Retour vers l'application normale
     } catch (e) {
       setErr(e.message);
+      toast(e.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -30,27 +54,40 @@ export default function ChangePasswordScreen({ user, onSave, onLogout }) {
           </div>
           <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Changement de mot de passe</h2>
           <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 13, marginBottom: 32, lineHeight: 1.6 }}>
-            Bienvenue <strong style={{ color: '#fff' }}>{user?.name}</strong> ! Pour des raisons de sécurité, vous devez définir un nouveau mot de passe avant de continuer.
+            Bienvenue <strong style={{ color: '#fff' }}>{user?.name}</strong> !<br />
+            Pour des raisons de sécurité, vous devez définir un nouveau mot de passe avant de continuer.
           </p>
 
           <div style={{ display: 'grid', gap: 18 }}>
             <Field label="Nouveau mot de passe" required>
-              <Inp type="password" value={form.newPwd} onChange={e => { setForm(f => ({ ...f, newPwd: e.target.value })); setErr(''); }}
-                placeholder="Minimum 8 caractères" autoFocus />
+              <Inp 
+                type="password" 
+                value={form.newPwd} 
+                onChange={e => { setForm(f => ({ ...f, newPwd: e.target.value })); setErr(''); }}
+                placeholder="Minimum 8 caractères" 
+                autoFocus 
+              />
             </Field>
             <Field label="Confirmer le mot de passe" required>
-              <Inp type="password" value={form.confirmPwd} onChange={e => { setForm(f => ({ ...f, confirmPwd: e.target.value })); setErr(''); }}
+              <Inp 
+                type="password" 
+                value={form.confirmPwd} 
+                onChange={e => { setForm(f => ({ ...f, confirmPwd: e.target.value })); setErr(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleSave()}
-                placeholder="Répétez le mot de passe" />
+                placeholder="Répétez le mot de passe" 
+              />
             </Field>
 
-            {err && <div style={{ fontSize: 12, color: T.red, display: 'flex', alignItems: 'center', gap: 6 }}><Ic n="alert" s={12} c={T.red} />{err}</div>}
+            {err && <div style={{ fontSize: 12, color: T.red, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Ic n="alert" s={12} c={T.red} />{err}
+            </div>}
 
             <Btn onClick={handleSave} disabled={loading} full size="lg">
-              {loading ? 'Enregistrement...' : 'Définir le mot de passe'}
+              {loading ? 'Enregistrement en cours...' : 'Définir le mot de passe'}
             </Btn>
-            <Btn v="ghost" onClick={onLogout} full>
-              <Ic n="logout" s={14} /> Se déconnecter
+
+            <Btn v="ghost" onClick={() => window.location.reload()} full>
+              <Ic n="logout" s={14} /> Annuler et se reconnecter
             </Btn>
           </div>
         </div>
