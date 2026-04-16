@@ -10,7 +10,7 @@ export function onUnauthorized(callback) {
   window.onUnauthorized = callback;
 }
 
-// Wrapper fetch avec token
+// Wrapper fetch avec token automatique
 async function fetchWithAuth(url, options = {}) {
   const config = {
     headers: {
@@ -35,7 +35,7 @@ async function fetchWithAuth(url, options = {}) {
   return response.json();
 }
 
-// Download helper
+// Fonction pour télécharger un fichier (utilisée par SettingsView, Excel, etc.)
 export function downloadBlob(data, filename, type = 'application/octet-stream') {
   const blob = new Blob([data], { type });
   const url = URL.createObjectURL(blob);
@@ -48,7 +48,7 @@ export function downloadBlob(data, filename, type = 'application/octet-stream') 
   URL.revokeObjectURL(url);
 }
 
-// API complète
+// API principale - TOUTES les fonctions utilisées par ton app
 export const api = {
   me: () => fetchWithAuth('/api/auth/me'),
   logout: () => fetchWithAuth('/api/auth/logout', { method: 'POST' }),
@@ -60,33 +60,38 @@ export const api = {
     }),
 
   getBases: () => fetchWithAuth('/api/bases'),
-  createBase: (name) => fetchWithAuth('/api/bases', { method: 'POST', body: JSON.stringify({ name }) }),
+  createBase: (name) =>
+    fetchWithAuth('/api/bases', { method: 'POST', body: JSON.stringify({ name }) }),
 
   getItems: (baseId, params = {}) => {
-    const q = new URLSearchParams({ base_id: baseId, ...params });
-    return fetchWithAuth(`/api/items?${q.toString()}`);
+    const query = new URLSearchParams({ base_id: baseId, ...params });
+    return fetchWithAuth(`/api/items?${query.toString()}`);
   },
 
-  createItem: (data) => fetchWithAuth('/api/items', { method: 'POST', body: JSON.stringify(data) }),
-  updateItem: (id, data) => fetchWithAuth(`/api/items/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteItem: (id) => fetchWithAuth(`/api/items/${id}`, { method: 'DELETE' }),
+  createItem: (data) =>
+    fetchWithAuth('/api/items', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateItem: (id, data) =>
+    fetchWithAuth(`/api/items/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  deleteItem: (id) =>
+    fetchWithAuth(`/api/items/${id}`, { method: 'DELETE' }),
 
   getColumns: (baseId) => fetchWithAuth(`/api/bases/${baseId}/columns`),
 
   getAlerts: () => fetchWithAuth('/api/items/alerts'),
 
   getSettings: () => fetchWithAuth('/api/settings'),
-  saveSettings: (data) => fetchWithAuth('/api/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  saveSettings: (data) =>
+    fetchWithAuth('/api/settings', { method: 'PUT', body: JSON.stringify(data) }),
 
   getHistory: (params = {}) => {
-    const q = new URLSearchParams(params);
-    return fetchWithAuth(`/api/history?${q.toString()}`);
+    const query = new URLSearchParams(params);
+    return fetchWithAuth(`/api/history?${query.toString()}`);
   },
 
   getMouvements: (params = {}) => {
-    const q = new URLSearchParams(params);
-    return fetchWithAuth(`/api/mouvements?${q.toString()}`);
+    const query = new URLSearchParams(params);
+    return fetchWithAuth(`/api/mouvements?${query.toString()}`);
   },
 };
-
-export { downloadBlob };
