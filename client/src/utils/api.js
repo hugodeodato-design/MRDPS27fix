@@ -1,104 +1,104 @@
-// src/utils/api.js — Client HTTP centralisé
-const BASE = '/api';
+// client/src/utils/api.js
+let token = null;
 
-let _token = null;
-let _onUnauthorized = null;
-
-export function setToken(token) { _token = token; }
-export function getToken() { return _token; }
-export function onUnauthorized(cb) { _onUnauthorized = cb; }
-
-async function request(method, path, body = null, options = {}) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (_token) headers['Authorization'] = `Bearer ${_token}`;
-
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : null,
-    ...options,
-  });
-
-  if (res.status === 401) {
-    _token = null;
-    localStorage.removeItem('mrdp_token');
-    if (_onUnauthorized) _onUnauthorized();
-    throw new Error('Session expirée');
-  }
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Erreur réseau' }));
-    throw new Error(err.error || `Erreur ${res.status}`);
-  }
-
-  // Réponses sans body (204)
-  if (res.status === 204) return null;
-
-  // Réponses binaires (export xlsx)
-  const ct = res.headers.get('content-type') || '';
-  if (ct.includes('application/vnd') || ct.includes('octet-stream')) {
-    return res.blob();
-  }
-
-  return res.json();
+export function setToken(newToken) {
+  token = newToken;
 }
 
+// Fonction pour gérer les erreurs 401 (token expiré)
+export function onUnauthorized(callback) {
+  // Cette fonction sera appelée par le fetch wrapper quand on reçoit 401
+  window.onUnauthorized = callback;
+}
+
+// Wrapper fetch avec token automatique
+async function fetchWithAuth(url, options = {}) {
+  const config = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    ...options,
+  };
+
+  const response = await fetch(url, config);
+
+  if (response.status === 401) {
+    if (window.onUnauthorized) window.onUnauthorized();
+    throw new Error('Token manquant ou invalide');
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Erreur ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// API principale
 export const api = {
-  get:    (path)         => request('GET', path),
-  post:   (path, body)   => request('POST', path, body),
-  put:    (path, body)   => request('PUT', path, body),
-  delete: (path)         => request('DELETE', path),
-
   // Auth
-  login:          (userId, password) => request('POST', '/auth/login', { email: userId, password }),
-  logout:         ()                 => request('POST', '/auth/logout'),
-  me:             ()                 => request('GET', '/auth/me'),
-  changePassword: (data)             => request('POST', '/auth/change-password', data),
-
-  // Users
-  getUsers:    ()        => request('GET', '/users'),
-  createUser:  (data)    => request('POST', '/users', data),
-  updateUser:  (id, data)=> request('PUT', `/users/${id}`, data),
-  deleteUser:  (id)      => request('DELETE', `/users/${id}`),
+  me: () => fetchWithAuth('/api/auth/me'),
+  logout: () => fetchWithAuth('/api/auth/logout', { method: 'POST' }),
+  
+  // Changement de mot de passe (premier login)
+  changePassword: (newPassword) => 
+    fetchWithAuth('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ newPassword }),
+    }),
 
   // Bases
-  getBases:       ()          => request('GET', '/bases'),
-  createBase:     (name)      => request('POST', '/bases', { name }),
-  updateBase:     (id, name)  => request('PUT', `/bases/${id}`, { name }),
-  deleteBase:     (id)        => request('DELETE', `/bases/${id}`),
-  getColumns:     (baseId)    => request('GET', `/bases/${baseId}/columns`),
-  saveColumns:    (baseId, c) => request('PUT', `/bases/${baseId}/columns`, c),
+  getBases: () => fetchWithAuth('/api/bases'),
+  createBase: (name) => 
+    fetchWithAuth('/api/bases', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
 
-  // Items
-  getItems:    (baseId, params = {}) => {
-    const q = new URLSearchParams({ base_id: baseId, ...params });
-    return request('GET', `/items?${q}`);
-  },
-  getAlerts:   ()             => request('GET', '/items/alerts'),
-  createItem:  (data)         => request('POST', '/items', data),
-  updateItem:  (id, data)     => request('PUT', `/items/${id}`, data),
-  deleteItem:  (id)           => request('DELETE', `/items/${id}`),
-  bulkImport:  (baseId, items)=> request('POST', '/items/bulk', { base_id: baseId, items }),
-
-  // History
-  getHistory:  (params = {}) => {
-    const q = new URLSearchParams(params);
-    return request('GET', `/history?${q}`);
+  // Items (Stock)
+  getItems: (baseId, params = {}) => {
+    const query = new URLSearchParams();
+    if (params.search) query.append('search', params.search);
+    if (params.etat) query.append('etat', params.etat);
+    const url = `/api/items?base_id=${baseId}&${query.toString()}`;
+    return fetchWithAuth(url);
   },
 
-  // Settings
-  getSettings:  ()     => request('GET', '/settings'),
-  saveSettings: (data) => request('PUT', '/settings', data),
+  createItem: (data) => 
+    fetchWithAuth('/api/items', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
-  // Export (renvoie un Blob)
-  exportBase: (id)   => request('GET', `/export/base/${id}`),
-  exportAll:  ()     => request('GET', '/export/all'),
+  updateItem: (id, data) => 
+    fetchWithAuth(`/api/items/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteItem: (id) => 
+    fetchWithAuth(`/api/items/${id}`, { method: 'DELETE' }),
+
+  getColumns: (baseId) => fetchWithAuth(`/api/bases/${baseId}/columns`),
+
+  // Alertes
+  getAlerts: () => fetchWithAuth('/api/items/alerts'),
+
+  // Autres
+  getSettings: () => fetchWithAuth('/api/settings'),
+  saveSettings: (data) => 
+    fetchWithAuth('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  // Mouvements
+  getMouvements: (params = {}) => {
+    const query = new URLSearchParams(params);
+    return fetchWithAuth(`/api/mouvements?${query.toString()}`);
+  },
 };
 
-export function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+export { fetchWithAuth };
