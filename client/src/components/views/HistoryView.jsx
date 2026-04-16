@@ -17,8 +17,8 @@ export default function HistoryView({ user, bases }) {
     if (search) params.search = search;
     if (baseFilter) params.base_id = baseFilter;
     const data = await api.getHistory(params);
-    setRows(data.rows || []);
-    setTotal(data.total || 0);
+    setRows(Array.isArray(data) ? data : (data?.rows || []));
+    setTotal(data?.total || (Array.isArray(data) ? data.length : 0));
   }, [search, baseFilter, offset]);
 
   useEffect(() => { load(); }, [load]);

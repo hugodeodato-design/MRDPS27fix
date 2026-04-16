@@ -13,41 +13,6 @@
 </head>
 <body>
   <div id="root"></div>
-
-  <!-- Polyfill window.storage pour VPS/navigateur (remplace l'API Artifact de Claude.ai) -->
-  <script>
-    if (!window.storage) {
-      const PREFIX = 'mrdp_store_';
-      window.storage = {
-        get: async function(key) {
-          try {
-            var v = localStorage.getItem(PREFIX + key);
-            return v !== null ? { key: key, value: v } : null;
-          } catch(e) { return null; }
-        },
-        set: async function(key, value) {
-          try {
-            var s = (typeof value === 'string') ? value : JSON.stringify(value);
-            localStorage.setItem(PREFIX + key, s);
-            return { key: key, value: s };
-          } catch(e) { return null; }
-        },
-        delete: async function(key) {
-          try { localStorage.removeItem(PREFIX + key); return { key: key, deleted: true }; }
-          catch(e) { return null; }
-        },
-        list: async function(prefix) {
-          try {
-            var keys = Object.keys(localStorage)
-              .filter(function(k){ return k.startsWith(PREFIX + (prefix||'')); })
-              .map(function(k){ return k.slice(PREFIX.length); });
-            return { keys: keys };
-          } catch(e) { return { keys: [] }; }
-        }
-      };
-    }
-  </script>
-
   <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

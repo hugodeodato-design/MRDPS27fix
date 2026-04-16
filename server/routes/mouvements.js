@@ -23,8 +23,6 @@ router.get('/', (req, res) => {
   // Isolation client : force le filtrage sur sa propre base
   const clientBaseId = getClientBaseId(req);
   if (clientBaseId !== null) {
-    // Un client peut lire les mouvements de sa base seulement
-    // Si base_id fourni mais pas la sienne → 403
     if (base_id && base_id !== clientBaseId) {
       return res.status(403).json({ error: 'Accès non autorisé à cette base' });
     }

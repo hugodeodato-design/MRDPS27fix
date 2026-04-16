@@ -9,7 +9,7 @@ export default function AlertsView({ onSelectBase }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getAlerts().then(setAlerts).catch(console.error).finally(() => setLoading(false));
+    api.getAlerts().then(a => setAlerts(Array.isArray(a) ? a : [])).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   return (

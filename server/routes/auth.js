@@ -17,7 +17,7 @@ const loginLimiter = rateLimit({
 });
 
 // ─── GET /api/auth/users-list (public) ───────────────────────────────────────
-// Gardé pour compatibilité — retourne juste le nombre d'utilisateurs actifs
+// Retourne uniquement le nombre d'utilisateurs actifs (pour écran de login)
 router.get('/users-list', (req, res) => {
   const db    = getDb();
   const count = db.prepare(`SELECT COUNT(*) as n FROM users WHERE is_active = 1`).get();
@@ -75,7 +75,6 @@ router.post('/login', loginLimiter, (req, res) => {
       role:                user.role,
       color:               user.color,
       mustChangePassword:  !!user.must_change_password,
-      client_base_id:      user.client_base_id || null,
     },
   });
 });
@@ -169,8 +168,7 @@ router.post('/invite', requireAuth, async (req, res) => {
   `).run(uuidv4(), email.trim().toLowerCase(), name.trim(),
     role || 'user', color || '#0065FF', token, req.user.id, expiresAt);
 
-  // Stocker client_base_id séparément dans une table temporaire ou via le token
-  // Pour les clients, on stocke l'info dans les invitations via un champ extra
+  // Pour les clients, stocker la base assignée
   if (role === 'client' && client_base_id) {
     db.prepare(`UPDATE invitations SET client_base_id = ? WHERE token = ?`).run(client_base_id, token);
   }

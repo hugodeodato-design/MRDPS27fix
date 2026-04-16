@@ -66,7 +66,6 @@ app.use('/api/', rateLimit({
 
 // ─── Routes API ───────────────────────────────────────────────────────────────
 app.use('/api/auth',       require('./routes/auth'));
-app.use('/api/state',      require('./routes/state'));   // ← sync état frontend ↔ DB
 app.use('/api/users',      require('./routes/users'));
 app.use('/api/bases',      require('./routes/bases'));
 app.use('/api/items',      require('./routes/items'));
@@ -74,6 +73,7 @@ app.use('/api/mouvements', require('./routes/mouvements'));
 app.use('/api/history',    require('./routes/history'));
 app.use('/api/settings',   require('./routes/settings'));
 app.use('/api/export',     require('./routes/export'));
+app.use('/api/state', require('./routes/state'));
 app.use('/api/admin',      require('./routes/admin'));
 
 // ─── Healthcheck public ───────────────────────────────────────────────────────

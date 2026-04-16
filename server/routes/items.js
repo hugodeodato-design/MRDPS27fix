@@ -79,10 +79,6 @@ router.get('/:id', (req, res) => {
   const db = getDb();
   const item = db.prepare(`SELECT * FROM items WHERE id = ?`).get(req.params.id);
   if (!item) return res.status(404).json({ error: 'Article introuvable' });
-  // Isolation client
-  if (!clientCanAccessBase(req, item.base_id)) {
-    return res.status(403).json({ error: 'Accès non autorisé à cette base' });
-  }
   res.json({ ...item, custom_fields: JSON.parse(item.custom_fields || '{}') });
 });
 
@@ -93,6 +89,11 @@ router.post('/', requireWrite, (req, res) => {
 
   if (!base_id || !reference?.trim() || !designation?.trim()) {
     return res.status(400).json({ error: 'base_id, référence et désignation requis' });
+  }
+
+  // Isolation client
+  if (!clientCanAccessBase(req, base_id)) {
+    return res.status(403).json({ error: 'Accès non autorisé à cette base' });
   }
 
   // Vérifier que la base existe

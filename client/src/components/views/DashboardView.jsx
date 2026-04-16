@@ -1,33 +1,60 @@
 // src/components/views/DashboardView.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { T, formatDate } from '../../utils/theme.js';
 import { Ic, Btn, Card, StatCard, Badge, Avatar } from '../ui/index.jsx';
 import { api } from '../../utils/api.js';
 
 const PALETTE = ['#00875A', '#0065FF', '#6554C0', '#FF8B00', '#00B8D9', '#DE350B'];
+const pct = (a, b) => b > 0 ? Math.round((a / b) * 100) : 0;
 
 export default function DashboardView({ bases, user, settings, onSelectBase, onNewBase, alertCount }) {
-  const [history, setHistory] = useState([]);
-  const [alerts, setAlerts] = useState([]);
+  const [history, setHistory]       = useState([]);
+  const [alerts, setAlerts]         = useState([]);
+  const [mvtData, setMvtData]       = useState([]);
+  const [allItems, setAllItems]     = useState([]);
   const [newBaseName, setNewBaseName] = useState('');
   const [showNewBase, setShowNewBase] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating]     = useState(false);
+  const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
     Promise.all([
       api.getHistory({ limit: 8 }),
       api.getAlerts(),
-    ]).then(([h, a]) => {
-      setHistory(h.rows || []);
-      setAlerts(a);
-    }).catch(console.error);
+      api.get('/mouvements/stats?days=7').catch(() => []),
+      api.get('/items/stats').catch(() => null),
+    ]).then(([h, a, mvt, stats]) => {
+      setHistory(Array.isArray(h) ? h : (h?.rows || []));
+      setAlerts(Array.isArray(a) ? a : []);
+      setMvtData(Array.isArray(mvt) ? mvt : []);
+    }).catch(console.error)
+    .finally(() => setLoading(false));
   }, []);
 
-  // Stats globales
-  const totalItems    = bases.reduce((s, b) => s + (b.total_items || 0), 0);
-  const totalInStock  = bases.reduce((s, b) => s + (b.items_en_stock || 0), 0);
-  const totalSortis   = bases.reduce((s, b) => s + (b.items_sortis || 0), 0);
-  const pct = (a, b) => b > 0 ? Math.round((a / b) * 100) : 0;
+  // Stats globales depuis bases
+  const totalItems   = bases.reduce((s, b) => s + (b.total_items || 0), 0);
+  const totalInStock = bases.reduce((s, b) => s + (b.items_en_stock || 0), 0);
+  const totalSortis  = bases.reduce((s, b) => s + (b.items_sortis || 0), 0);
+  const totalAlertes = bases.reduce((s, b) => s + (b.alerts || 0), 0);
+
+  const topBases = [...bases].sort((a, b) => (b.total_items || 0) - (a.total_items || 0)).slice(0, 5);
+
+  // Graphique mouvements 7 jours
+  const mvtStats = useMemo(() => {
+    const days = 7;
+    const result = [];
+    for (let d = days - 1; d >= 0; d--) {
+      const dt = new Date(); dt.setDate(dt.getDate() - d);
+      const label  = dt.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+      const dayStr = dt.toISOString().slice(0, 10);
+      const entrees = mvtData.filter(m => m.jour === dayStr && m.type === 'entree').reduce((s, m) => s + (m.nb_mouvements || 0), 0);
+      const sorties = mvtData.filter(m => m.jour === dayStr && m.type === 'sortie').reduce((s, m) => s + (m.nb_mouvements || 0), 0);
+      result.push({ label, entries: entrees, exits: sorties });
+    }
+    return result;
+  }, [mvtData]);
+
+  const maxBar = Math.max(1, ...mvtStats.map(d => Math.max(d.entries, d.exits)));
 
   const handleNewBase = async () => {
     if (!newBaseName.trim()) return;
@@ -36,12 +63,8 @@ export default function DashboardView({ bases, user, settings, onSelectBase, onN
       await onNewBase(newBaseName.trim());
       setNewBaseName('');
       setShowNewBase(false);
-    } finally {
-      setCreating(false);
-    }
+    } finally { setCreating(false); }
   };
-
-  const topBases = [...bases].sort((a, b) => (b.total_items || 0) - (a.total_items || 0)).slice(0, 5);
 
   return (
     <div style={{ padding: 24, overflowY: 'auto', height: '100%' }}>
@@ -79,19 +102,87 @@ export default function DashboardView({ bases, user, settings, onSelectBase, onN
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14, marginBottom: 24 }}>
-        <StatCard icon="building" label="Bases" value={bases.length} color={T.blue} bg={T.blueBg} bdr={T.blueBdr} />
-        <StatCard icon="package" label="Articles total" value={totalItems} color={T.brand} bg={T.greenBg} bdr={T.greenBdr} />
-        <StatCard icon="check" label="En stock" value={totalInStock} sub={`${pct(totalInStock, totalItems)}% du total`} color={T.green} bg={T.greenBg} bdr={T.greenBdr} />
-        <StatCard icon="arrowDown" label="Sortis" value={totalSortis} color={T.red} bg={T.redBg} bdr={T.redBdr} />
-        <StatCard icon="bell" label="Alertes stock bas" value={alertCount} color={T.orange} bg={T.orangeBg} bdr={T.orangeBdr} />
+        <StatCard icon="building"  label="Bases"           value={bases.length}  color={T.blue}   bg={T.blueBg}   bdr={T.blueBdr}   onClick={() => {}} />
+        <StatCard icon="package"   label="Articles total"  value={totalItems}    color={T.brand}  bg={T.greenBg}  bdr={T.greenBdr}  />
+        <StatCard icon="check"     label="En stock"        value={totalInStock}  sub={`${pct(totalInStock, totalItems)}% du total`} color={T.green}  bg={T.greenBg}  bdr={T.greenBdr} />
+        <StatCard icon="arrowDown" label="Sortis"          value={totalSortis}   color={T.red}    bg={T.redBg}    bdr={T.redBdr}    />
+        <StatCard icon="bell"      label="Alertes stock"   value={alertCount || totalAlertes} color={T.orange} bg={T.orangeBg} bdr={T.orangeBdr} />
       </div>
 
+      {/* Row 1 : graphique mouvements + activité récente */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 18, marginBottom: 18 }}>
+
+        {/* Graphique mouvements 7 jours */}
+        <Card p={0} sx={{ overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${T.bdr}` }}>
+            <div style={{ width: 32, height: 32, borderRadius: 9, background: T.greenBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Ic n="barChart" s={14} c={T.green} />
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: T.txt }}>Mouvements — 7 derniers jours</div>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, fontSize: 11 }}>
+              <span style={{ color: T.green, fontWeight: 600 }}>● Entrées</span>
+              <span style={{ color: T.red,   fontWeight: 600 }}>● Sorties</span>
+            </div>
+          </div>
+          <div style={{ padding: '20px 20px 16px', display: 'flex', alignItems: 'flex-end', gap: 10, height: 130 }}>
+            {mvtStats.map((d, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 80 }}>
+                  <div title={`${d.entries} entrées`} style={{ width: 13, background: T.green, borderRadius: '3px 3px 0 0', height: `${Math.max(4, (d.entries / maxBar) * 76)}px`, transition: 'height .4s' }} />
+                  <div title={`${d.exits} sorties`}   style={{ width: 13, background: T.red,   borderRadius: '3px 3px 0 0', height: `${Math.max(4, (d.exits   / maxBar) * 76)}px`, transition: 'height .4s' }} />
+                </div>
+                <div style={{ fontSize: 9, color: T.muted, textAlign: 'center', whiteSpace: 'nowrap' }}>{d.label}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Activité récente */}
+        <Card p={0} sx={{ overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.bdr}`, fontWeight: 700, fontSize: 15, color: T.txt, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 9, background: T.purpleBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Ic n="history" s={14} c={T.purple} />
+            </div>
+            Activité récente
+          </div>
+          {history.length === 0 ? (
+            <div style={{ padding: 48, textAlign: 'center', color: T.muted, fontSize: 13 }}>Aucune activité</div>
+          ) : (
+            <div style={{ overflowY: 'auto', maxHeight: 280 }}>
+              {history.map((h, i) => {
+                const isAdd = h.action.includes('créé') || h.action.includes('ajouté') || h.action.includes('Import');
+                const isDel = h.action.includes('supprimé');
+                const isMod = h.action.includes('modifié');
+                const bv = isDel ? 'red' : isAdd ? 'green' : isMod ? 'blue' : 'gray';
+                return (
+                  <div key={h.id} style={{ padding: '10px 20px', display: 'flex', alignItems: 'flex-start', gap: 10, borderBottom: i < history.length - 1 ? `1px solid ${T.bdr}` : 'none' }}>
+                    <Avatar name={h.user_name} size={28} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: T.txt }}>{h.user_name}</span>
+                        <Badge v={bv} sm>{h.action}</Badge>
+                      </div>
+                      <div style={{ fontSize: 11, color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.detail}</div>
+                      <div style={{ fontSize: 10, color: T.muted, marginTop: 2 }}>{formatDate(h.created_at?.slice(0, 10))}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Row 2 : bases + alertes */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 18, marginBottom: 18 }}>
+
         {/* Bases table */}
         <Card p={0} sx={{ overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${T.bdr}` }}>
             <div style={{ fontWeight: 700, fontSize: 15, color: T.txt, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 9, background: T.blueBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="package" s={14} c={T.blue} /></div>
+              <div style={{ width: 32, height: 32, borderRadius: 9, background: T.blueBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Ic n="package" s={14} c={T.blue} />
+              </div>
               Bases de stock
             </div>
           </div>
@@ -112,12 +203,14 @@ export default function DashboardView({ bases, user, settings, onSelectBase, onN
               <tbody>
                 {topBases.map(b => {
                   const total = b.total_items || 0;
-                  const inS = b.items_en_stock || 0;
+                  const inS   = b.items_en_stock || 0;
                   return (
                     <tr key={b.id} onClick={() => onSelectBase(b.id)} style={{ cursor: 'pointer', borderBottom: `1px solid ${T.bdr}` }}>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ width: 32, height: 32, borderRadius: 9, background: T.greenBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="building" s={13} c={T.green} /></div>
+                          <div style={{ width: 32, height: 32, borderRadius: 9, background: T.greenBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Ic n="building" s={13} c={T.green} />
+                          </div>
                           <span style={{ fontWeight: 600, fontSize: 13, color: T.txt }}>{b.name}</span>
                           {b.alerts > 0 && <Badge v="orange" sm dot>{b.alerts}</Badge>}
                         </div>
@@ -131,7 +224,7 @@ export default function DashboardView({ bases, user, settings, onSelectBase, onN
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                        <span style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.brand, fontWeight: 600, fontSize: 12 }}>Ouvrir →</span>
+                        <span style={{ color: T.brand, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>Ouvrir →</span>
                       </td>
                     </tr>
                   );
@@ -141,66 +234,43 @@ export default function DashboardView({ bases, user, settings, onSelectBase, onN
           )}
         </Card>
 
-        {/* Activity feed */}
+        {/* Alertes stock bas */}
         <Card p={0} sx={{ overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.bdr}`, fontWeight: 700, fontSize: 15, color: T.txt, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 9, background: T.purpleBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="history" s={14} c={T.purple} /></div>
-            Activité récente
+            <div style={{ width: 32, height: 32, borderRadius: 9, background: T.orangeBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Ic n="bell" s={14} c={T.orange} />
+            </div>
+            Alertes stock bas
+            {alerts.length > 0 && <Badge v="orange" sm>{alerts.length}</Badge>}
           </div>
-          {history.length === 0 ? (
-            <div style={{ padding: 48, textAlign: 'center', color: T.muted, fontSize: 13 }}>Aucune activité</div>
+          {alerts.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: T.muted, fontSize: 13 }}>
+              <Ic n="check" s={32} c={T.green} />
+              <div style={{ marginTop: 10, fontWeight: 600, color: T.green }}>Tout est en ordre</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>Aucun article sous le seuil</div>
+            </div>
           ) : (
-            <div style={{ padding: '6px 0', overflowY: 'auto', maxHeight: 320 }}>
-              {history.map((h, i) => {
-                const isAdd = h.action.includes('créé') || h.action.includes('ajouté') || h.action.includes('Import');
-                const isDel = h.action.includes('supprimé');
-                const isMod = h.action.includes('modifié');
-                const bv = isDel ? 'red' : isAdd ? 'green' : isMod ? 'blue' : 'gray';
-                return (
-                  <div key={h.id} style={{ padding: '10px 20px', display: 'flex', alignItems: 'flex-start', gap: 10, borderBottom: i < history.length - 1 ? `1px solid ${T.bdr}` : 'none' }}>
-                    <Avatar name={h.user_name} size={30} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: T.txt }}>{h.user_name}</span>
-                        <Badge v={bv} sm>{h.action}</Badge>
-                      </div>
-                      <div style={{ fontSize: 11, color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.detail}</div>
-                      <div style={{ fontSize: 10, color: T.muted, marginTop: 2 }}>{formatDate(h.created_at?.slice(0, 10))}</div>
-                    </div>
+            <div style={{ overflowY: 'auto', maxHeight: 280 }}>
+              {alerts.slice(0, 6).map(item => (
+                <div key={item.id} onClick={() => onSelectBase(item.base_id)}
+                  style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${T.bdr}`, cursor: 'pointer' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: T.orange, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: T.txt, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.designation}</div>
+                    <div style={{ fontSize: 11, color: T.muted }}>{item.base_name} · Qté: {item.quantite} / Seuil: {item.seuil}</div>
                   </div>
-                );
-              })}
+                  <Badge v="red" sm dot>{item.quantite}</Badge>
+                </div>
+              ))}
+              {alerts.length > 6 && (
+                <div style={{ padding: '10px 16px', fontSize: 12, color: T.muted, textAlign: 'center' }}>
+                  + {alerts.length - 6} autres alertes
+                </div>
+              )}
             </div>
           )}
         </Card>
       </div>
-
-      {/* Alertes stock bas */}
-      {alerts.length > 0 && (
-        <Card p={0} sx={{ overflow: 'hidden', border: `1px solid ${T.orangeBdr}`, background: T.orangeBg }}>
-          <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Ic n="alert" s={18} c={T.orange} />
-            <span style={{ fontWeight: 700, fontSize: 14, color: T.orange }}>{alerts.length} article{alerts.length > 1 ? 's' : ''} en dessous du seuil d'alerte</span>
-          </div>
-          <div style={{ background: T.surface, borderTop: `1px solid ${T.orangeBdr}` }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <tbody>
-                {alerts.slice(0, 4).map(item => (
-                  <tr key={item.id} onClick={() => onSelectBase(item.base_id)} style={{ cursor: 'pointer', borderBottom: `1px solid ${T.bdr}` }}>
-                    <td style={{ padding: '11px 20px' }}>
-                      <span style={{ fontWeight: 600, fontSize: 13, color: T.txt }}>{item.designation}</span>
-                      <span style={{ fontSize: 11, color: T.muted, marginLeft: 8 }}>{item.reference}</span>
-                    </td>
-                    <td style={{ padding: '11px 16px' }}><Badge v="gray" sm>{item.base_name}</Badge></td>
-                    <td style={{ padding: '11px 16px' }}><Badge v="red" dot sm>Qté: {item.quantite}</Badge></td>
-                    <td style={{ padding: '11px 16px' }}><span style={{ fontSize: 12, color: T.muted }}>Seuil: {item.seuil}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
     </div>
   );
 }

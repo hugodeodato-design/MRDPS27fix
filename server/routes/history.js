@@ -1,17 +1,12 @@
 // routes/history.js — Historique des actions
 const router = require('express').Router();
 const { getDb } = require('../db/init');
-const { requireAuth, requireNotClient } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 
 router.use(requireAuth);
 
 // ─── GET /api/history?base_id=&search=&limit=&offset= ────────────────────────
 router.get('/', (req, res) => {
-  // Les clients n'ont pas accès à l'historique global
-  if (req.user.role === 'client') {
-    return res.status(403).json({ error: 'Accès non autorisé' });
-  }
-
   const { base_id, search, limit = 200, offset = 0 } = req.query;
   const db = getDb();
 

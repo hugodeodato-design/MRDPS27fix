@@ -2,7 +2,7 @@
 const router = require('express').Router();
 const XLSX = require('xlsx');
 const { getDb } = require('../db/init');
-const { requireAuth, requireNotClient } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 
 router.use(requireAuth);
 
@@ -11,15 +11,6 @@ router.get('/base/:id', (req, res) => {
   const db = getDb();
   const base = db.prepare(`SELECT * FROM bases WHERE id = ?`).get(req.params.id);
   if (!base) return res.status(404).json({ error: 'Base introuvable' });
-
-  // Isolation client : ne peut exporter que sa propre base (mais les clients
-  // n'ont pas le bouton export dans le frontend — double sécurité côté serveur)
-  if (req.user.role === 'client') {
-    const user = db.prepare(`SELECT client_base_id FROM users WHERE id = ?`).get(req.user.id);
-    if (user?.client_base_id !== req.params.id) {
-      return res.status(403).json({ error: 'Accès non autorisé à cette base' });
-    }
-  }
 
   const items = db.prepare(`SELECT * FROM items WHERE base_id = ? ORDER BY designation`).all(req.params.id);
 
@@ -49,7 +40,7 @@ router.get('/base/:id', (req, res) => {
 });
 
 // ─── GET /api/export/all ──────────────────────────────────────────────────────
-router.get('/all', requireNotClient, (req, res) => {
+router.get('/all', (req, res) => {
   const db = getDb();
   const bases = db.prepare(`SELECT * FROM bases WHERE is_active = 1 ORDER BY name`).all();
   const wb = XLSX.utils.book_new();

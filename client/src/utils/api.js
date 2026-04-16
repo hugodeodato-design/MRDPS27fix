@@ -50,7 +50,7 @@ export const api = {
   delete: (path)         => request('DELETE', path),
 
   // Auth
-  login:          (userId, password) => request('POST', '/auth/login', { userId, password }),
+  login:          (userId, password) => request('POST', '/auth/login', { email: userId, password }),
   logout:         ()                 => request('POST', '/auth/logout'),
   me:             ()                 => request('GET', '/auth/me'),
   changePassword: (data)             => request('POST', '/auth/change-password', data),

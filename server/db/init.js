@@ -33,7 +33,7 @@ function initDb() {
       id                   TEXT PRIMARY KEY,
       name                 TEXT NOT NULL,
       email                TEXT UNIQUE,
-      role                 TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('admin','user','viewer','client')),
+      role                 TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('admin','user','viewer')),
       color                TEXT NOT NULL DEFAULT '#00875A',
       password_hash        TEXT,
       must_change_password INTEGER NOT NULL DEFAULT 0,
@@ -67,8 +67,7 @@ function initDb() {
       created_at   TEXT NOT NULL DEFAULT (datetime('now')),
       expires_at   TEXT NOT NULL,
       used_at      TEXT,
-      is_used      INTEGER NOT NULL DEFAULT 0,
-      client_base_id TEXT REFERENCES bases(id)
+      is_used      INTEGER NOT NULL DEFAULT 0
     );
 
     -- Bases clients
@@ -167,7 +166,6 @@ function initDb() {
     db.exec(`ALTER TABLE users ADD COLUMN client_base_id TEXT REFERENCES bases(id)`);
 
   // ── Migration CHECK constraint : ajouter le rôle 'client' si absent ─────────
-  // SQLite ne supporte pas ALTER TABLE ... MODIFY COLUMN, on doit recréer la table
   const userSchema = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='users'`).get();
   if (userSchema && !userSchema.sql.includes("'client'")) {
     console.log('⚙️  Migration : ajout du rôle client dans la table users...');
