@@ -1,4 +1,5 @@
 // client/src/utils/api.js
+
 let token = null;
 
 export function setToken(newToken) {
