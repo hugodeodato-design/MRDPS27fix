@@ -9,7 +9,7 @@ export function onUnauthorized(callback) {
   window.onUnauthorized = callback;
 }
 
-// Wrapper fetch avec token
+// Wrapper fetch avec token automatique
 async function fetchWithAuth(url, options = {}) {
   const config = {
     headers: {
@@ -34,7 +34,7 @@ async function fetchWithAuth(url, options = {}) {
   return response.json();
 }
 
-// Fonction utilitaire pour télécharger un blob (utilisée dans SettingsView, Excel, etc.)
+// Fonction pour télécharger un fichier (utilisée dans SettingsView, Excel, etc.)
 export function downloadBlob(data, filename, type = 'application/octet-stream') {
   const blob = new Blob([data], { type });
   const url = URL.createObjectURL(blob);
@@ -49,6 +49,7 @@ export function downloadBlob(data, filename, type = 'application/octet-stream') 
 
 // API principale
 export const api = {
+  // Auth
   me: () => fetchWithAuth('/api/auth/me'),
   logout: () => fetchWithAuth('/api/auth/logout', { method: 'POST' }),
   
@@ -58,10 +59,15 @@ export const api = {
       body: JSON.stringify({ newPassword }),
     }),
 
+  // Bases
   getBases: () => fetchWithAuth('/api/bases'),
   createBase: (name) => 
-    fetchWithAuth('/api/bases', { method: 'POST', body: JSON.stringify({ name }) }),
+    fetchWithAuth('/api/bases', { 
+      method: 'POST', 
+      body: JSON.stringify({ name }) 
+    }),
 
+  // Items
   getItems: (baseId, params = {}) => {
     const query = new URLSearchParams({ base_id: baseId });
     if (params.search) query.append('search', params.search);
@@ -69,21 +75,40 @@ export const api = {
     return fetchWithAuth(`/api/items?${query.toString()}`);
   },
 
-  createItem: (data) => fetchWithAuth('/api/items', { method: 'POST', body: JSON.stringify(data) }),
-  updateItem: (id, data) => fetchWithAuth(`/api/items/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteItem: (id) => fetchWithAuth(`/api/items/${id}`, { method: 'DELETE' }),
+  createItem: (data) => 
+    fetchWithAuth('/api/items', { 
+      method: 'POST', 
+      body: JSON.stringify(data) 
+    }),
+
+  updateItem: (id, data) => 
+    fetchWithAuth(`/api/items/${id}`, { 
+      method: 'PUT', 
+      body: JSON.stringify(data) 
+    }),
+
+  deleteItem: (id) => 
+    fetchWithAuth(`/api/items/${id}`, { method: 'DELETE' }),
 
   getColumns: (baseId) => fetchWithAuth(`/api/bases/${baseId}/columns`),
 
+  // Alertes
   getAlerts: () => fetchWithAuth('/api/items/alerts'),
 
+  // Settings
   getSettings: () => fetchWithAuth('/api/settings'),
-  saveSettings: (data) => fetchWithAuth('/api/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  saveSettings: (data) => 
+    fetchWithAuth('/api/settings', { 
+      method: 'PUT', 
+      body: JSON.stringify(data) 
+    }),
 
+  // Mouvements
   getMouvements: (params = {}) => {
     const query = new URLSearchParams(params);
     return fetchWithAuth(`/api/mouvements?${query.toString()}`);
   },
 };
 
+// Export de downloadBlob (une seule fois !)
 export { downloadBlob };
