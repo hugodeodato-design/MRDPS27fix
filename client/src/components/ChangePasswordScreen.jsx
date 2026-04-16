@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Ic, Btn, Field, Inp, toast } from './ui/index.jsx';
 import { T } from '../utils/theme.js';
+import { api } from '../utils/api.js';   // ← Important : on utilise l'api qui gère le token
 
 export default function ChangePasswordScreen({ user, onChanged }) {
   const [form, setForm] = useState({ newPwd: '', confirmPwd: '' });
@@ -22,24 +23,20 @@ export default function ChangePasswordScreen({ user, onChanged }) {
     setErr('');
 
     try {
-      // Appel à l'API de changement de mot de passe
-      const resp = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPassword: form.newPwd }),
-      });
+      // On utilise l'api qui inclut automatiquement le token
+      await api.changePassword(form.newPwd);
 
-      const data = await resp.json();
+      toast('Mot de passe défini avec succès !', 'success');
+      
+      // On attend un peu puis on appelle onChanged pour revenir à l'app normale
+      setTimeout(() => {
+        if (onChanged) onChanged();
+      }, 800);
 
-      if (!resp.ok) {
-        throw new Error(data.error || 'Erreur lors du changement de mot de passe');
-      }
-
-      toast('Mot de passe défini avec succès', 'success');
-      if (onChanged) onChanged();   // Retour vers l'application normale
     } catch (e) {
-      setErr(e.message);
-      toast(e.message, 'error');
+      const msg = e.message || 'Erreur lors du changement de mot de passe';
+      setErr(msg);
+      toast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -49,9 +46,11 @@ export default function ChangePasswordScreen({ user, onChanged }) {
     <div style={{ position: 'fixed', inset: 0, background: '#060D18', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, fontFamily: "'DM Sans',system-ui,sans-serif" }}>
       <div style={{ width: '100%', maxWidth: 440, padding: 24 }}>
         <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 24, padding: 44 }}>
+          
           <div style={{ width: 56, height: 56, borderRadius: 16, background: T.orangeBg, border: `1px solid ${T.orangeBdr}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
             <Ic n="lock" s={24} c={T.orange} />
           </div>
+
           <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Changement de mot de passe</h2>
           <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 13, marginBottom: 32, lineHeight: 1.6 }}>
             Bienvenue <strong style={{ color: '#fff' }}>{user?.name}</strong> !<br />
@@ -68,6 +67,7 @@ export default function ChangePasswordScreen({ user, onChanged }) {
                 autoFocus 
               />
             </Field>
+
             <Field label="Confirmer le mot de passe" required>
               <Inp 
                 type="password" 
@@ -78,16 +78,14 @@ export default function ChangePasswordScreen({ user, onChanged }) {
               />
             </Field>
 
-            {err && <div style={{ fontSize: 12, color: T.red, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Ic n="alert" s={12} c={T.red} />{err}
-            </div>}
+            {err && (
+              <div style={{ fontSize: 12, color: T.red, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Ic n="alert" s={12} c={T.red} />{err}
+              </div>
+            )}
 
             <Btn onClick={handleSave} disabled={loading} full size="lg">
               {loading ? 'Enregistrement en cours...' : 'Définir le mot de passe'}
-            </Btn>
-
-            <Btn v="ghost" onClick={() => window.location.reload()} full>
-              <Ic n="logout" s={14} /> Annuler et se reconnecter
             </Btn>
           </div>
         </div>

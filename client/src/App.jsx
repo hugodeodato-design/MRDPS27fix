@@ -1,6 +1,6 @@
 // client/src/App.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, setToken, onUnauthorized, downloadBlob } from './utils/api.js';
+import { api, setToken, onUnauthorized } from './utils/api.js';
 import { T } from './utils/theme.js';
 import { Ic, Btn, toast, registerToast } from './components/ui/index.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
@@ -23,7 +23,6 @@ import ExcelView from './components/views/ExcelView.jsx';
 import BonTransportView from './components/views/BonTransportView.jsx';
 
 // ─── Toast global ─────────────────────────────────────────────────────────────
-let _toastFn = null;
 function Toast({ msg, type }) {
   if (!msg) return null;
   const bg = type === 'error' ? T.redBg : T.greenBg;
@@ -40,7 +39,18 @@ function Toast({ msg, type }) {
 // ─── Sidebar nav item ─────────────────────────────────────────────────────────
 function NavItem({ icon, label, active, onClick, badge }) {
   return (
-    <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: active ? 600 : 500, background: active ? T.greenBg : 'transparent', color: active ? '#fff' : 'rgba(255,255,255,.5)', borderLeft: active ? `3px solid ${T.brand}` : '3px solid transparent', transition: 'all .15s', position: 'relative' }}>
+    <button 
+      onClick={onClick} 
+      style={{ 
+        display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 14px', 
+        borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'inherit', 
+        fontSize: 13, fontWeight: active ? 600 : 500, 
+        background: active ? T.greenBg : 'transparent', 
+        color: active ? '#fff' : 'rgba(255,255,255,.5)', 
+        borderLeft: active ? `3px solid ${T.brand}` : '3px solid transparent', 
+        transition: 'all .15s' 
+      }}
+    >
       <Ic n={icon} s={16} c={active ? T.brand : 'rgba(255,255,255,.4)'} />
       <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
       {badge > 0 && <span style={{ background: T.red, color: '#fff', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '1px 6px', minWidth: 18, textAlign: 'center' }}>{badge}</span>}
@@ -154,7 +164,7 @@ export default function App() {
     setView('dashboard');
   };
 
-  // ── Change password ────────────────────────────────────────────────────────
+  // ── Change password (premier login) ────────────────────────────────────────
   const handlePasswordChanged = () => {
     setMustChangePwd(false);
     loadBases();
@@ -197,13 +207,16 @@ export default function App() {
   // Vérifier si c'est un lien d'activation
   const activationToken = new URLSearchParams(window.location.search).get('token');
   if (activationToken) {
-    return <ActivationScreen token={activationToken} companyName={settings?.companyName}
+    return <ActivationScreen 
+      token={activationToken} 
+      companyName={settings?.companyName}
       onActivated={(token, u) => {
         localStorage.setItem('mrdp_token', token);
         setToken(token);
         setUser(u);
         window.history.replaceState({}, '', '/');
-      }} />;
+      }} 
+    />;
   }
 
   // Vue client (rôle client)
@@ -216,7 +229,6 @@ export default function App() {
   }
 
   const isAdmin = user.role === 'admin';
-  const isViewer = user.role === 'viewer';
 
   // ── Sidebar ────────────────────────────────────────────────────────────────
   const activeBase = bases.find(b => b.id === activeBaseId);
@@ -254,10 +266,10 @@ export default function App() {
             <NavItem icon="home" label="Dashboard" active={view === 'dashboard' && !activeBaseId} onClick={() => { setView('dashboard'); setActiveBaseId(null); }} />
             <NavItem icon="bell" label="Alertes" active={view === 'alerts'} onClick={() => { setView('alerts'); setActiveBaseId(null); }} badge={alertCount} />
             <NavItem icon="history" label="Historique" active={view === 'history'} onClick={() => { setView('history'); setActiveBaseId(null); }} />
-            <NavItem icon="search"   label="Recherche globale"  active={view === 'search'}        onClick={() => { setView('search');        setActiveBaseId(null); }} />
-            <NavItem icon="tag"      label="Étiquettes QR"       active={view === 'labels'}        onClick={() => { setView('labels');        setActiveBaseId(null); }} />
-            <NavItem icon="server"   label="Viewer Excel"        active={view === 'excel'}         onClick={() => { setView('excel');         setActiveBaseId(null); }} />
-            <NavItem icon="fileText" label="Bon de transport"    active={view === 'bontransport'}  onClick={() => { setView('bontransport');  setActiveBaseId(null); }} />
+            <NavItem icon="search" label="Recherche globale" active={view === 'search'} onClick={() => { setView('search'); setActiveBaseId(null); }} />
+            <NavItem icon="tag" label="Étiquettes QR" active={view === 'labels'} onClick={() => { setView('labels'); setActiveBaseId(null); }} />
+            <NavItem icon="server" label="Viewer Excel" active={view === 'excel'} onClick={() => { setView('excel'); setActiveBaseId(null); }} />
+            <NavItem icon="fileText" label="Bon de transport" active={view === 'bontransport'} onClick={() => { setView('bontransport'); setActiveBaseId(null); }} />
             <NavItem icon="refresh" label="Mouvements" active={view === 'mouvements'} onClick={() => { setView('mouvements'); setActiveBaseId(null); }} />
             <NavItem icon="check" label="Inventaire physique" active={view === 'inventaire'} onClick={() => { setView('inventaire'); setActiveBaseId(null); }} />
             <NavItem icon="barChart" label="Rapports & Export" active={view === 'rapports'} onClick={() => { setView('rapports'); setActiveBaseId(null); }} />            
@@ -272,7 +284,7 @@ export default function App() {
             )}
           </div>
 
-          {/* User */}
+          {/* User info */}
           <div style={{ padding: '12px 8px', borderTop: `1px solid rgba(255,255,255,.06)` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,.04)' }}>
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: user.color || T.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
@@ -280,7 +292,9 @@ export default function App() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: '#fff', fontWeight: 600, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
-                <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 10 }}>{user.role === 'admin' ? 'Administrateur' : user.role === 'viewer' ? 'Lecture seule' : 'Utilisateur'}</div>
+                <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 10 }}>
+                  {user.role === 'admin' ? 'Administrateur' : user.role === 'viewer' ? 'Lecture seule' : 'Utilisateur'}
+                </div>
               </div>
               <button onClick={handleLogout} title="Déconnexion" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', color: 'rgba(255,255,255,.3)' }}>
                 <Ic n="logout" s={15} c="rgba(255,255,255,.3)" />
@@ -309,7 +323,7 @@ export default function App() {
             {view === 'rapports' && 'Rapports & Export'}
             {view === 'search' && 'Recherche globale'}
             {view === 'labels' && 'Étiquettes QR'}
-            {view === 'excel'  && 'Viewer Excel'}
+            {view === 'excel' && 'Viewer Excel'}
             {view === 'bontransport' && 'Bon de transport'}
             {view === 'settings' && 'Paramètres'}
           </div>
@@ -322,56 +336,19 @@ export default function App() {
 
         {/* View */}
         <div style={{ flex: 1, overflow: 'hidden' }}>
-          {view === 'bases' && (
-            <BasesView
-              bases={bases}
-              user={user}
-              onSelectBase={handleSelectBase}
-              onNewBase={handleNewBase}
-              onRefreshBases={loadBases}
-            />
-          )}
-          {view === 'dashboard' && (
-            <DashboardView
-              bases={bases}
-              user={user}
-              settings={settings}
-              onSelectBase={handleSelectBase}
-              onNewBase={handleNewBase}
-              alertCount={alertCount}
-            />
-          )} 
-          {view === 'stock' && activeBaseId && (
-            <StockView
-              key={activeBaseId}
-              baseId={activeBaseId}
-              user={user}
-              bases={bases}
-              onRefreshBases={loadBases}
-              onRefreshAlerts={loadAlerts}
-            />
-          )}
+          {view === 'bases' && <BasesView bases={bases} user={user} onSelectBase={handleSelectBase} onNewBase={handleNewBase} onRefreshBases={loadBases} />}
+          {view === 'dashboard' && <DashboardView bases={bases} user={user} settings={settings} onSelectBase={handleSelectBase} onNewBase={handleNewBase} alertCount={alertCount} />}
+          {view === 'stock' && activeBaseId && <StockView key={activeBaseId} baseId={activeBaseId} user={user} bases={bases} onRefreshBases={loadBases} onRefreshAlerts={loadAlerts} />}
           {view === 'mouvements' && <MouvementsView bases={bases} user={user} />}
           {view === 'inventaire' && <InventaireView bases={bases} user={user} />}
-          {view === 'rapports' && <RapportsView bases={bases} user={user} />} 
-          {view === 'search'       && <GlobalSearchView bases={bases} onSelectBase={handleSelectBase} />}
-          {view === 'labels'       && <LabelsView bases={bases} />}
-          {view === 'excel'        && <ExcelView />}
+          {view === 'rapports' && <RapportsView bases={bases} user={user} />}
+          {view === 'search' && <GlobalSearchView bases={bases} onSelectBase={handleSelectBase} />}
+          {view === 'labels' && <LabelsView bases={bases} />}
+          {view === 'excel' && <ExcelView />}
           {view === 'bontransport' && <BonTransportView bases={bases} user={user} settings={settings} />}
-          {view === 'users' && isAdmin && (
-            <UsersView user={user} bases={bases} />
-          )}
-          {view === 'history' && (
-            <HistoryView user={user} bases={bases} />
-          )}
-          {view === 'alerts' && (
-            <AlertsView
-              user={user}
-              bases={bases}
-              onSelectBase={handleSelectBase}
-              onRefreshAlerts={loadAlerts}
-            />
-          )}
+          {view === 'users' && isAdmin && <UsersView user={user} bases={bases} />}
+          {view === 'history' && <HistoryView user={user} bases={bases} />}
+          {view === 'alerts' && <AlertsView user={user} bases={bases} onSelectBase={handleSelectBase} onRefreshAlerts={loadAlerts} />}
           {view === 'settings' && isAdmin && (
             <SettingsView
               user={user}
@@ -379,7 +356,7 @@ export default function App() {
               onSave={async (form) => {
                 await api.saveSettings(form);
                 await loadSettings();
-                toast('Paramètres sauvegardés');
+                toast('Paramètres sauvegardés', 'success');
               }}
             />
           )}
