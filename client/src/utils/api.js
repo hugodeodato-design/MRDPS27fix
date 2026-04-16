@@ -35,7 +35,7 @@ async function fetchWithAuth(url, options = {}) {
   return response.json();
 }
 
-// Fonction pour télécharger un fichier
+// Download helper
 export function downloadBlob(data, filename, type = 'application/octet-stream') {
   const blob = new Blob([data], { type });
   const url = URL.createObjectURL(blob);
@@ -50,6 +50,8 @@ export function downloadBlob(data, filename, type = 'application/octet-stream') 
 
 // API complète
 export const api = {
+  get: (url) => fetchWithAuth(url),                    // Résout "W.get is not a function"
+
   me: () => fetchWithAuth('/api/auth/me'),
   logout: () => fetchWithAuth('/api/auth/logout', { method: 'POST' }),
 
@@ -58,8 +60,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ newPassword }),
     }),
-
-  get: (url) => fetchWithAuth(url),   // ← Méthode générique ajoutée ici
 
   getBases: () => fetchWithAuth('/api/bases'),
   createBase: (name) => fetchWithAuth('/api/bases', { method: 'POST', body: JSON.stringify({ name }) }),
