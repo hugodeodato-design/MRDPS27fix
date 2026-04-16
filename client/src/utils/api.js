@@ -35,7 +35,7 @@ async function fetchWithAuth(url, options = {}) {
   return response.json();
 }
 
-// Download helper
+// Download helper (exporté une seule fois)
 export function downloadBlob(data, filename, type = 'application/octet-stream') {
   const blob = new Blob([data], { type });
   const url = URL.createObjectURL(blob);
@@ -50,7 +50,7 @@ export function downloadBlob(data, filename, type = 'application/octet-stream') 
 
 // API complète
 export const api = {
-  get: (url) => fetchWithAuth(url),                    // Résout "W.get is not a function"
+  get: (url) => fetchWithAuth(url),
 
   me: () => fetchWithAuth('/api/auth/me'),
   logout: () => fetchWithAuth('/api/auth/logout', { method: 'POST' }),
@@ -90,5 +90,3 @@ export const api = {
     return fetchWithAuth(`/api/mouvements?${query.toString()}`);
   },
 };
-
-export { downloadBlob };
