@@ -19,7 +19,7 @@ export default function UsersView({ user: currentUser, bases }) {
   const loadInvites = useCallback(async () => {
     setLoadingInvites(true);
     try {
-      const data = await api.get('/auth/invitations');
+      const data = await api.getInvitations();
       setInvites(Array.isArray(data) ? data : []);
     } catch { setInvites([]); }
     finally { setLoadingInvites(false); }
@@ -33,7 +33,7 @@ export default function UsersView({ user: currentUser, bases }) {
 
   const handleCancelInvite = async (id) => {
     try {
-      await api.delete(`/auth/invitations/${id}`);
+      await api.cancelInvitation(id);
       await loadInvites();
       toast('Invitation annulée');
     } catch (e) { toast(e.message, 'error'); }
@@ -270,7 +270,7 @@ function InviteModal({ bases, onClose }) {
     if (form.role === 'client' && !form.client_base_id) { setErr('Sélectionnez une base pour ce client'); return; }
     setLoading(true); setErr('');
     try {
-      const data = await api.post('/auth/invite', form);
+      const data = await api.invite(form);
       if (data.emailSent) {
         setSent(true);
       } else {
