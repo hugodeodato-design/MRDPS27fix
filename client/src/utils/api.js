@@ -135,4 +135,3 @@ export const api = {
   delete: (path) => fetchWithAuth(`/api${path}`, { method: 'DELETE' }),
 };
 
-export { downloadBlob };
