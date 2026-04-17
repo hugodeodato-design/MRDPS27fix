@@ -88,5 +88,3 @@ export const api = {
     return fetchWithAuth(`/api/mouvements?${q.toString()}`);
   },
 };
-
-export { downloadBlob };
